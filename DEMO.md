@@ -1,17 +1,24 @@
-# Guion de demostración (3 minutos)
+# Demo walkthrough (3 minutes)
 
-1. Abrir [`showcase/index.html`](showcase/index.html). Aclarar que los datos son Olist 2016–2018 y que el tablero funciona sin servicios externos.
-2. Mostrar los cuatro indicadores: R$ 13.221.498,11 de mercancía entregada, 96.478 pedidos, AOV R$ 137,04 y recompra 3,00 %. La métrica de valor excluye flete y reembolsos no observados.
-3. En **Tendencias**, alternar entre valor mensual y AOV. Seleccionar noviembre de 2017 para mostrar el pico de R$ 987.765,37. Explicar que el gráfico omite los meses limítrofes con cobertura escasa, aunque estos permanecen en el mart y el CSV.
-4. Mostrar el ranking de categorías y las señales de entrega: 6,77 % de pedidos entregados tarde entre los que tienen fechas comparables.
-5. En **Consultas guiadas**, elegir una pregunta. La respuesta muestra valor, denominador cuando aplica y tabla curada.
-6. Ir a **Solución**. Seguir el diagrama de cinco capas: CSV → raw → hechos/dimensiones → marts → web/API/GPT. Explicar dos decisiones: agregar artículos y pagos antes del join evita duplicar importes; usar `customer_unique_id` permite medir recompra real. La sección incluye otros cuatro riesgos y sus soluciones, más un guion oral de un minuto.
-7. Abrir **Validación** y `reports/VALIDATION.md` para mostrar las 25 verificaciones y las diferencias de pagos conservadas como excepciones.
-8. Si hay créditos API, iniciar `python showcase_server.py` y preguntar por un mes en lenguaje natural. GPT selecciona una de cinco métricas; el servidor ejecuta SQL fijo de solo lectura y construye la respuesta con datos del mart. Si no hay créditos, la demo guiada sigue disponible.
+The entire application and its metric answers use English. The data is a historical Olist snapshot from 2016–2018, not current NearShift business data.
 
-## Qué demuestra la solución
+1. Open [`showcase/index.html`](showcase/index.html) for an offline demo, or start `python showcase_server.py` and open `http://127.0.0.1:8001/` to enable live queries against the local database.
+2. In **Overview**, show the full-dataset metrics: R$ 13,221,498.11 in delivered merchandise, 96,478 delivered orders, R$ 137.04 AOV and 3.00% repeat purchase rate. Merchandise value excludes freight and unobserved refunds; it is a revenue proxy.
+3. Switch the chart between **Value** and **AOV**. Use **Inspect month** to select November 2017: R$ 987,765.37 across 7,289 delivered orders. Explain that this selection only changes the chart detail, while the four headline metrics retain their full-dataset scope. Sparse boundary months remain in the mart and CSV.
+4. Show the category ranking and the 6.77% late-delivery rate. Its denominator includes only delivered orders with comparable actual and estimated dates.
+5. Open **Ask the data**. In **Offline examples**, select a metric to show its definition, denominator where applicable and curated source table. These examples work without a server or API credits; the month selector affects only monthly value and AOV.
+6. With the local server running, switch to **Revenue lookup**. November 2017 returns R$ 987,765.37 through a real MCP tool backed by DuckDB, using no OpenAI credits. **Latest available month** returns August 2018. Try `2026-09` to demonstrate explicit no-data handling.
+7. If API credits are available, open **AI assistant**, click **November 2017 value** to fill the example, then click **Ask the assistant**. GPT selects an intent and month; monthly merchandise value goes through MCP. The application formats the verified result in English. The other four metrics use the shared service with fixed SQL. Unsupported requests and missing months receive explicit responses.
+8. Open **Engineering**. Follow the five pipeline stages, inspect the validation evidence and expand two decisions: independent item/payment aggregation prevents duplicate amounts; customer_unique_id enables repeat purchase measurement. Open `reports/VALIDATION.md` for all 25 checks and explain the 303 retained payment exceptions.
 
-- Ingesta reproducible y modelo con granos explícitos para órdenes, artículos y pagos.
-- Definiciones de métricas y diferencias frente a pagos contables documentadas.
-- Validación automática antes de generar los reportes y el tablero.
-- Entregable autónomo que se puede abrir desde el ZIP y una extensión GPT acotada a los datos solicitados.
+## What the solution demonstrates
+
+- Reproducible ingestion and explicit grains for orders, items and payments.
+- Shared metric definitions with documented differences from accounting payments.
+- Automated validation before generating reports and the dashboard.
+- A standalone deliverable with separately maintained HTML, CSS and JavaScript.
+- Bounded queries, a read-only MCP tool and optional natural-language routing through OpenAI.
+
+## One-minute technical explanation
+
+Operational CSVs mix order, item and payment grains. The pipeline preserves the source, applies types and explicit business definitions, and creates reconciled marts. The reports, dashboard and query service use these same definitions. GPT interprets the question; the database supplies the numbers. The deliverable makes historical coverage and unresolved payment exceptions visible.

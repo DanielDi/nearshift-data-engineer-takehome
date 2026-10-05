@@ -1,0 +1,35 @@
+# Short-lived evaluation deployment. No paid resources or persistent disks.
+services:
+  - type: web
+    name: nearshift-takehome-demo
+    runtime: python
+    plan: free
+    region: oregon
+    branch: feat/mcp-metrics
+    autoDeployTrigger: "off"
+    buildCommand: pip install -r requirements.lock.txt && python deploy/render_build.py
+    startCommand: python showcase_server.py --db data/serving.duckdb --skip-build
+    healthCheckPath: /health
+    envVars:
+      - key: PYTHON_VERSION
+        value: 3.13.2
+      - key: PYTHONUNBUFFERED
+        value: "1"
+      - key: DEMO_USERNAME
+        value: reviewer
+      - key: DEMO_PASSWORD
+        generateValue: true
+      - key: OPENAI_MODEL
+        value: gpt-6-luna
+      # Add OPENAI_API_KEY manually as a Render secret after access/budget checks.
+      - key: OPENAI_USAGE_DATABASE_URL
+        fromDatabase:
+          name: nearshift-demo-usage
+          property: connectionString
+databases:
+  - name: nearshift-demo-usage
+    plan: free
+    region: oregon
+    databaseName: nearshift_usage
+    user: nearshift_usage
+    ipAllowList: []

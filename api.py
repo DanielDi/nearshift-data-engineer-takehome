@@ -14,62 +14,9 @@ from urllib.parse import parse_qs, urlsplit
 import duckdb
 
 
-ROOT = Path(__file__).resolve().parent
-DEFAULT_DB = ROOT / "data" / "nearshift.duckdb"
+from metrics import DEFAULT_DB, ROOT, MONTH_PATTERN, query_month
+
 OPENAPI_PATH = ROOT / "api" / "openapi.json"
-MONTH_PATTERN = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])\Z")
-METRIC_DEFINITION = (
-    "Sum of item prices for delivered orders, assigned to purchase month; "
-    "excludes freight and unobserved refunds. This is a revenue proxy, "
-    "not accounting revenue."
-)
-
-
-def query_month(database_path: Path, month: date | None) -> dict | None:
-    """Read only the curated monthly mart; None selects the latest month with sales."""
-    db = duckdb.connect(str(database_path), read_only=True)
-    try:
-        if month is None:
-            row = db.execute(
-                """SELECT purchase_month, merchandise_value, delivered_orders,
-                          in_trend_window
-                   FROM analytics.mart_monthly_metrics
-                   WHERE delivered_orders > 0
-                   ORDER BY purchase_month DESC LIMIT 1"""
-            ).fetchone()
-        else:
-            row = db.execute(
-                """SELECT purchase_month, merchandise_value, delivered_orders,
-                          in_trend_window
-                   FROM analytics.mart_monthly_metrics
-                   WHERE purchase_month = ?""",
-                [month],
-            ).fetchone()
-        if row is None:
-            return None
-        latest_source_date = db.execute(
-            "SELECT CAST(MAX(purchased_at) AS DATE) FROM analytics.fact_order"
-        ).fetchone()[0]
-    finally:
-        db.close()
-
-    purchase_month, amount, order_count, in_trend_window = row
-    return {
-        "metric": "delivered_merchandise_value",
-        "month": purchase_month.strftime("%Y-%m"),
-        "value": format(Decimal(amount), ".2f"),
-        "currency": "BRL",
-        "delivered_orders": int(order_count),
-        "definition": METRIC_DEFINITION,
-        "source_table": "analytics.mart_monthly_metrics",
-        "in_trend_window": bool(in_trend_window),
-        "latest_source_purchase_date": latest_source_date.isoformat(),
-        "coverage_note": (
-            "Historical snapshot; this is not a current-month business metric."
-            if in_trend_window
-            else "Sparse source boundary month; interpret the value with caution."
-        ),
-    }
 
 
 def create_server(database_path: Path, port: int = 8000) -> ThreadingHTTPServer:

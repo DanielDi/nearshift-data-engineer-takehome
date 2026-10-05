@@ -4,6 +4,8 @@ This repository loads the public [Olist Brazilian E-Commerce dataset](https://ww
 
 ## Open the finished demo
 
+The hosted review demo is available at **https://nearshift-takehome-demo.onrender.com/**. Use the reviewer credentials provided separately. The deployed English dashboard supports direct MCP revenue queries and GPT questions. See [`deploy/RENDER.md`](deploy/RENDER.md) for deployment evidence and the temporary Free service limits.
+
 Open [`showcase/index.html`](showcase/index.html) in a browser. The English interface has three views: **Overview** for metrics and charts, **Ask the data** for queries, and **Engineering** for architecture and validation. Query modes are separate tabs: **AI assistant**, **Revenue lookup** and **Offline examples**. The packaged page embeds its data, styles and scripts; all charts and offline examples work without services. It works offline after extracting the ZIP. Edit `showcase/template.html`, `showcase/dashboard.css` and `showcase/dashboard.js`, then run `python build_showcase.py` to regenerate the standalone HTML. Legacy links such as `#consultas` still open the matching view. A short presenter walkthrough is in [`DEMO.md`](DEMO.md). To enable free-text GPT questions on the same page, run the local server after the database is built:
 
 ```powershell
@@ -14,7 +16,7 @@ Then open `http://127.0.0.1:8001/`. This optional feature uses the existing `OPE
 
 ## Continue on another computer
 
-Clone the [private GitHub repository](https://github.com/DanielDi/nearshift-data-engineer-takehome) and open `showcase/index.html` for an immediate offline demo:
+Clone the [GitHub repository](https://github.com/DanielDi/nearshift-data-engineer-takehome) and open `showcase/index.html` for an immediate offline demo. The default `main` branch contains the complete submission:
 
 ```powershell
 git clone https://github.com/DanielDi/nearshift-data-engineer-takehome.git

@@ -16,7 +16,7 @@ Successful server startup and that hosted AI request confirm the persistent coun
 
 ## Deployment configuration
 
-The repository root [`render.yaml`](../render.yaml) is a Render Blueprint. It deploys branch `feat/mcp-metrics` without modifying `main`:
+The repository root [`render.yaml`](../render.yaml) is a Render Blueprint. The existing Render deployment follows branch `feat/mcp-metrics`. The complete submission is also integrated into the default `main` branch for reviewers; changing GitHub visibility does not remove the hosted application's reviewer authentication.
 
 | Resource | Configuration |
 |---|---|
@@ -34,8 +34,8 @@ The serving snapshot is produced during **build**, so waking the service does no
 
 ## Publish
 
-1. Publish the tested branch to the private repository with Daniel's explicit commit/push approval.
-2. Connect Render to GitHub with access only to this private repository. Create a new Blueprint using `render.yaml` on branch `feat/mcp-metrics`.
+1. Publish the tested application to the repository with Daniel's explicit commit/push approval. The default `main` branch is the reviewer entry point.
+2. Connect Render to GitHub with access only to this repository. Create a new Blueprint using `render.yaml` on branch `feat/mcp-metrics`.
 3. Review that both resources say **Free** before creating them. If a free database is unavailable in the account, stop; do not silently choose a paid tier. The web app can still serve direct MCP/offline queries without GPT.
 4. Render creates `DEMO_PASSWORD` and the internal `OPENAI_USAGE_DATABASE_URL` automatically. Retrieve the reviewer password privately from the service's environment settings; never put it in Git, URLs or logs.
 5. Confirm the unauthenticated `/health` endpoint and authenticated dashboard/MCP checks below. Then enter `OPENAI_API_KEY` privately in Render's secret environment settings and redeploy. The key is not in the Blueprint or application frontend, and the MCP subprocess receives no API key or database credential.

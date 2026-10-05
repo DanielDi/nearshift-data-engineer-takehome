@@ -2,7 +2,7 @@
 
 The entire application and its metric answers use English. The data is a historical Olist snapshot from 2016–2018, not current NearShift business data.
 
-1. Open [`showcase/index.html`](showcase/index.html) for an offline demo, or start `python showcase_server.py` and open `http://127.0.0.1:8001/` to enable live queries against the local database.
+1. Open the [hosted review demo](https://nearshift-takehome-demo.onrender.com/) with the reviewer credentials provided separately. Alternatively, open [`showcase/index.html`](showcase/index.html) for an offline demo, or start `python showcase_server.py` and open `http://127.0.0.1:8001/` for local queries.
 2. In **Overview**, show the full-dataset metrics: R$ 13,221,498.11 in delivered merchandise, 96,478 delivered orders, R$ 137.04 AOV and 3.00% repeat purchase rate. Merchandise value excludes freight and unobserved refunds; it is a revenue proxy.
 3. Switch the chart between **Value** and **AOV**. Use **Inspect month** to select November 2017: R$ 987,765.37 across 7,289 delivered orders. Explain that this selection only changes the chart detail, while the four headline metrics retain their full-dataset scope. Sparse boundary months remain in the mart and CSV.
 4. Show the category ranking and the 6.77% late-delivery rate. Its denominator includes only delivered orders with comparable actual and estimated dates.

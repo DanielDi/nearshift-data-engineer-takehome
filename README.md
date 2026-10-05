@@ -16,6 +16,8 @@ Then open `http://127.0.0.1:8001/`. This optional feature uses the existing `OPE
 
 Clone the Git repository and open `showcase/index.html` for an immediate offline demo. To rebuild the pipeline on the new computer, install Python 3.11+ and run the commands in **Run end to end** below. The first pipeline run downloads the public Olist source again. The raw CSVs, DuckDB database, local virtual environment, ZIP package, and original assignment PDF are deliberately excluded from Git. Transfer the PDF separately if it is needed for review. Configure `OPENAI_API_KEY` separately on that computer if you want to use GPT; never commit it or a `.env` file.
 
+If a remote is not available yet, transfer `NearShift_project.bundle` to the new computer and clone it with `git clone NearShift_project.bundle Prueba_NearShift`. The bundle contains the full Git history and source files; it does not contain the ignored database or PDF.
+
 ## Run end to end
 
 Use Python 3.11 or newer. From the repository root:

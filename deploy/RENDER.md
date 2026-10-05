@@ -10,7 +10,9 @@ Both provisioned resources were verified as **Free** in Render. The Postgres cou
 
 The hosted build completed all **25/25** pipeline validations and produced the **1,323,008-byte** serving database. Live HTTPS checks confirmed public health, protected dashboard/status, English navigation, MCP results for November 2017 and the latest available month, explicit no-data results, and rejection of cross-origin queries. Local automated tests passed **23/23**. The first GitHub Actions run was still queued at this point; do not treat it as a completed CI run.
 
-The first deployment intentionally has no OpenAI key. GPT activation and a live hosted GPT check remain pending private secret entry. Successful server startup proves that the persistent counter table can be initialized; concurrency and persistence across a hosted restart have not yet been verified.
+The initial deployment had no OpenAI key. On October 5, 2026, the existing key was stored privately in Render's `OPENAI_API_KEY` setting with Daniel's explicit authorization. The environment deployment went Live, readiness reported GPT configured, and one real authenticated OpenAI/MCP question returned HTTP 200: November 2017 delivered merchandise value **R$ 987,765.37 / 7,289 orders**. No key is stored in Git or the frontend.
+
+Successful server startup and that hosted AI request confirm the persistent counter is available for initialization and reservation. Concurrent reservations and counter persistence across a subsequent hosted restart have not yet been verified.
 
 ## Deployment configuration
 

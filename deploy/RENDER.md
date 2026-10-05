@@ -2,6 +2,16 @@
 
 This is a short-lived, authenticated demo. The Python web service and usage-counter Postgres instance both explicitly use `plan: free`. No persistent disk, paid plan, custom domain or automatic redeployment is configured. OpenAI calls are billed separately.
 
+## Deployment record — October 5, 2026
+
+The demo is deployed at **https://nearshift-takehome-demo.onrender.com/** from branch `feat/mcp-metrics`, initially commit `1026c38`. Reviewer authentication is required; retrieve the generated password privately from Render's `DEMO_PASSWORD` setting. Credentials are not included in this document.
+
+Both provisioned resources were verified as **Free** in Render. The Postgres counter expires on **November 4, 2026**; its own inbound rules block external internet connections.
+
+The hosted build completed all **25/25** pipeline validations and produced the **1,323,008-byte** serving database. Live HTTPS checks confirmed public health, protected dashboard/status, English navigation, MCP results for November 2017 and the latest available month, explicit no-data results, and rejection of cross-origin queries. Local automated tests passed **23/23**. The first GitHub Actions run was still queued at this point; do not treat it as a completed CI run.
+
+The first deployment intentionally has no OpenAI key. GPT activation and a live hosted GPT check remain pending private secret entry. Successful server startup proves that the persistent counter table can be initialized; concurrency and persistence across a hosted restart have not yet been verified.
+
 ## Deployment configuration
 
 The repository root [`render.yaml`](../render.yaml) is a Render Blueprint. It deploys branch `feat/mcp-metrics` without modifying `main`:

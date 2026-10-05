@@ -79,7 +79,7 @@ class AssistantTests(unittest.TestCase):
         answer, result = answer_question("Ingresos", self.database,
                                          FakeClient("monthly_revenue", None))
         self.assertEqual(result["status"], "month_required")
-        self.assertIn("Indica un mes", answer)
+        self.assertIn("Specify a month", answer)
         answer, result = answer_question("Ingresos en 2026-09", self.database,
                                          FakeClient("monthly_revenue", "2026-09"))
         self.assertEqual(result["status"], "month_unavailable")

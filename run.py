@@ -386,12 +386,15 @@ def main() -> int:
     parser.add_argument("--offline", action="store_true", help="Use existing data/raw CSVs only")
     parser.add_argument("--data-dir", type=Path, default=ROOT / "data")
     parser.add_argument("--report-dir", type=Path, default=ROOT / "reports")
+    parser.add_argument("--memory-limit", default="512MB", help="DuckDB memory budget, e.g. 256MB")
     args = parser.parse_args()
     args.data_dir.mkdir(parents=True, exist_ok=True)
     raw_dir = ensure_raw_files(args.data_dir, args.offline)
     db_path = args.data_dir / "nearshift.duckdb"
     db = duckdb.connect(str(db_path))
     try:
+        db.execute("SET memory_limit = ?", [args.memory_limit])
+        db.execute("SET threads = 1")
         load_raw(db, raw_dir)
         print("Building analytics tables and marts...")
         db.execute((ROOT / "sql" / "model.sql").read_text(encoding="utf-8"))

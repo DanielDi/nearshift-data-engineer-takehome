@@ -77,9 +77,14 @@ def build_showcase(database_path: Path, report_dir: Path,
                    output_path: Path = ROOT / "showcase" / "index.html") -> Path:
     data = build_data(database_path, report_dir)
     template = (ROOT / "showcase" / "template.html").read_text(encoding="utf-8")
+    css = (ROOT / "showcase" / "dashboard.css").read_text(encoding="utf-8")
+    javascript = (ROOT / "showcase" / "dashboard.js").read_text(encoding="utf-8")
     serialized = json.dumps(data, ensure_ascii=False, separators=(",", ":")).replace("<", "\\u003c")
     output_path.parent.mkdir(parents=True, exist_ok=True)
-    output_path.write_text(template.replace("__DATA_JSON__", serialized), encoding="utf-8")
+    page = (template.replace("__DASHBOARD_CSS__", css)
+            .replace("__DASHBOARD_JS__", javascript)
+            .replace("__DATA_JSON__", serialized))
+    output_path.write_text(page, encoding="utf-8")
     return output_path
 
 

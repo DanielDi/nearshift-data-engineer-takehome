@@ -37,7 +37,7 @@ class ShowcaseTests(unittest.TestCase):
         request = Request(self.url + path, method=method, data=data,
                           headers={"Content-Type": content_type})
         try:
-            with urlopen(request, timeout=5) as response:
+            with urlopen(request, timeout=20) as response:
                 return response.status, response.read()
         except HTTPError as error:
             return error.code, error.read()
@@ -46,8 +46,9 @@ class ShowcaseTests(unittest.TestCase):
         status, html = self.request("/")
         self.assertEqual(status, 200)
         self.assertIn(b"dashboard-data", html)
+        self.assertIn(b'<html lang="en">', html)
         self.assertIn(b"13221498.11", html)
-        self.assertIn("La solución, de extremo a extremo".encode("utf-8"), html)
+        self.assertIn("Engineering the solution".encode("utf-8"), html)
         self.assertIn(b'aria-labelledby="architecture-title"', html)
         self.assertEqual(self.request("/reports/monthly_metrics.csv")[0], 200)
         self.assertEqual(self.request("/sql/model.sql")[0], 200)

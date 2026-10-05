@@ -9,28 +9,21 @@ from __future__ import annotations
 import argparse
 import json
 import os
-import re
 import sys
-from datetime import date, timedelta
+from datetime import date, datetime, timedelta
 from decimal import Decimal
+from zoneinfo import ZoneInfo
 from pathlib import Path
 
 import duckdb
 from openai import APIConnectionError, APIError, AuthenticationError, OpenAI, RateLimitError
 
-from api import DEFAULT_DB, query_month
+from metrics import DEFAULT_DB, MONTH_PATTERN, METRICS, query_metric
+from metrics_client import get_monthly_revenue
 
 
-MODEL = "gpt-6-luna"
-MONTH_PATTERN = re.compile(r"[0-9]{4}-(0[1-9]|1[0-2])\Z")
-METRICS = {
-    "monthly_revenue",
-    "monthly_aov",
-    "repeat_purchase_rate",
-    "top_categories",
-    "late_delivery_rate",
-    "unsupported",
-}
+MODEL = os.environ.get("OPENAI_MODEL", "gpt-6-luna")
+
 TOOL = {
     "type": "function",
     "name": "select_requested_metric",
@@ -66,8 +59,8 @@ TOOL = {
 def route_question(question: str, client: OpenAI, model: str = MODEL) -> tuple[str, str | None]:
     """Get one bounded intent from GPT; discard any prose it returns."""
     if not question.strip() or len(question) > 1000:
-        raise ValueError("La pregunta debe tener entre 1 y 1000 caracteres.")
-    today = date.today()
+        raise ValueError("The question must contain between 1 and 1000 characters.")
+    today = datetime.now(ZoneInfo("America/Bogota")).date()
     previous_month = (today.replace(day=1) - timedelta(days=1)).strftime("%Y-%m")
     instructions = (
         "You route questions about the historical Olist take-home data. "
@@ -94,150 +87,86 @@ def route_question(question: str, client: OpenAI, model: str = MODEL) -> tuple[s
     )
     calls = [item for item in response.output if item.type == "function_call"]
     if len(calls) != 1 or calls[0].name != TOOL["name"]:
-        raise ValueError("El modelo no produjo una selección de métrica válida.")
+        raise ValueError("The model did not produce a valid metric selection.")
     try:
         args = json.loads(calls[0].arguments)
     except (TypeError, json.JSONDecodeError) as error:
-        raise ValueError("El modelo devolvió argumentos inválidos.") from error
-    if set(args) != {"metric", "month"} or args["metric"] not in METRICS:
-        raise ValueError("El modelo seleccionó una métrica no permitida.")
+        raise ValueError("The model returned invalid arguments.") from error
+    if (not isinstance(args, dict) or set(args) != {"metric", "month"}
+            or not isinstance(args["metric"], str) or args["metric"] not in METRICS):
+        raise ValueError("The model selected a metric that is not allowed.")
     month = args["month"]
     if month is not None and (not isinstance(month, str) or
                               (month != "latest" and not MONTH_PATTERN.fullmatch(month))):
-        raise ValueError("El modelo seleccionó un mes inválido.")
+        raise ValueError("The model selected an invalid month.")
     if month not in (None, "latest"):
         try:
             date.fromisoformat(month + "-01")
         except ValueError as error:
-            raise ValueError("El modelo seleccionó un mes inválido.") from error
+            raise ValueError("The model selected an invalid month.") from error
     return args["metric"], month
-
-
-def query_metric(database_path: Path, metric: str, month: str | None) -> dict:
-    """Execute one of five fixed queries; never interpolate model text into SQL."""
-    if metric not in METRICS:
-        raise ValueError("Métrica no permitida.")
-    if metric == "unsupported":
-        return {"status": "unsupported"}
-    if metric in {"monthly_revenue", "monthly_aov"}:
-        if month is None:
-            return {"status": "month_required"}
-        if month != "latest" and not MONTH_PATTERN.fullmatch(month):
-            raise ValueError("Mes inválido.")
-        selected_month = None if month == "latest" else date.fromisoformat(month + "-01")
-        if metric == "monthly_revenue":
-            row = query_month(database_path, selected_month)
-            return {"status": "ok", **row} if row else {"status": "month_unavailable", "month": month}
-        db = duckdb.connect(str(database_path), read_only=True)
-        try:
-            if selected_month is None:
-                row = db.execute(
-                    """SELECT purchase_month, average_order_value, delivered_orders,
-                              in_trend_window
-                       FROM analytics.mart_monthly_metrics
-                       WHERE delivered_orders > 0
-                       ORDER BY purchase_month DESC LIMIT 1"""
-                ).fetchone()
-            else:
-                row = db.execute(
-                    """SELECT purchase_month, average_order_value, delivered_orders,
-                              in_trend_window
-                       FROM analytics.mart_monthly_metrics
-                       WHERE purchase_month = ?""", [selected_month]
-                ).fetchone()
-        finally:
-            db.close()
-        if not row or row[1] is None:
-            return {"status": "month_unavailable", "month": month}
-        return {
-            "status": "ok", "metric": metric, "month": row[0].strftime("%Y-%m"),
-            "value": format(Decimal(row[1]), ".2f"), "currency": "BRL",
-            "delivered_orders": int(row[2]), "in_trend_window": bool(row[3]),
-            "source_table": "analytics.mart_monthly_metrics",
-        }
-    if month is not None:
-        return {"status": "unsupported"}
-    db = duckdb.connect(str(database_path), read_only=True)
-    try:
-        if metric == "repeat_purchase_rate":
-            repeat_count, customer_count = db.execute(
-                """SELECT COUNT(*) FILTER (WHERE is_repeat_customer), COUNT(*)
-                   FROM analytics.mart_customer_repeat"""
-            ).fetchone()
-            return {
-                "status": "ok", "metric": metric, "repeat_customers": repeat_count,
-                "delivered_customers": customer_count,
-                "rate_percent": round(100 * repeat_count / customer_count, 2)
-                if customer_count else None,
-                "source_table": "analytics.mart_customer_repeat",
-            }
-        if metric == "top_categories":
-            rows = db.execute(
-                """SELECT category_name, merchandise_value
-                   FROM analytics.mart_category_metrics
-                   ORDER BY merchandise_value DESC, category_name ASC LIMIT 5"""
-            ).fetchall()
-            return {
-                "status": "ok", "metric": metric, "currency": "BRL",
-                "categories": [
-                    {"category": name, "merchandise_value": format(Decimal(value), ".2f")}
-                    for name, value in rows
-                ],
-                "source_table": "analytics.mart_category_metrics",
-            }
-        late_orders, comparable_orders = db.execute(
-            """SELECT COUNT(*) FILTER (WHERE is_late), COUNT(*)
-               FROM analytics.mart_delivery"""
-        ).fetchone()
-        return {
-            "status": "ok", "metric": metric, "late_orders": late_orders,
-            "comparable_delivered_orders": comparable_orders,
-            "rate_percent": round(100 * late_orders / comparable_orders, 2)
-            if comparable_orders else None,
-            "source_table": "analytics.mart_delivery",
-        }
-    finally:
-        db.close()
 
 
 def answer_question(question: str, database_path: Path, client: OpenAI,
                     model: str = MODEL) -> tuple[str, dict]:
     metric, month = route_question(question, client, model)
-    result = query_metric(database_path, metric, month)
+    if metric == "monthly_revenue" and month is not None:
+        result = get_monthly_revenue(database_path, month)
+    else:
+        result = query_metric(database_path, metric, month)
+    return format_answer(metric, result), result
+
+
+def format_answer(metric: str, result: dict) -> str:
+    """Render only validated metric results, never model-generated prose."""
     status = result["status"]
     if status == "unsupported":
-        return ("Solo puedo responder sobre valor mensual, AOV mensual, tasa de "
-                "recompra, categorías principales y entregas tardías del dataset Olist.", result)
+        return ("I can answer questions about monthly merchandise value, monthly AOV, "
+                "repeat purchase rate, top categories and late deliveries in the Olist dataset.")
     if status == "month_required":
-        return ("Indica un mes YYYY-MM o pide el último mes disponible en la fuente.", result)
+        return "Specify a month as YYYY-MM or ask for the latest available source month."
     if status == "month_unavailable":
-        return (f"No hay datos para {result['month']} en esta fuente histórica de Olist.", result)
+        return f"No data is available for {result['month']} in this historical Olist source."
     if metric == "monthly_revenue":
-        answer = (f"Valor de mercancía entregada en {result['month']}: "
-                  f"R$ {result['value']} ({result['delivered_orders']} pedidos). "
-                  "Suma precios de artículos, sin flete ni reembolsos no observados.")
+        answer = (f"Delivered merchandise value in {result['month']}: "
+                  f"R$ {Decimal(result['value']):,.2f} ({result['delivered_orders']:,} orders). "
+                  "Sum of item prices, excluding freight and unobserved refunds.")
         if not result["in_trend_window"]:
-            answer += " Mes limítrofe con cobertura escasa."
+            answer += " Sparse source boundary month."
     elif metric == "monthly_aov":
-        answer = (f"AOV de pedidos entregados en {result['month']}: "
-                  f"R$ {result['value']} por pedido ({result['delivered_orders']} pedidos).")
+        answer = (f"Delivered-order AOV in {result['month']}: "
+                  f"R$ {Decimal(result['value']):,.2f} per order ({result['delivered_orders']:,} orders).")
         if not result["in_trend_window"]:
-            answer += " Mes limítrofe con cobertura escasa."
+            answer += " Sparse source boundary month."
     elif metric == "repeat_purchase_rate":
-        answer = (f"Tasa de recompra histórica: {result['rate_percent']:.2f}% "
-                  f"({result['repeat_customers']} de {result['delivered_customers']} "
-                  "clientes con al menos un pedido entregado).")
+        answer = (f"Historical repeat purchase rate: {result['rate_percent']:.2f}% "
+                  f"({result['repeat_customers']:,} of {result['delivered_customers']:,} "
+                  "customers with at least one delivered order).")
     elif metric == "top_categories":
         entries = ", ".join(
-            f"{row['category']} (R$ {row['merchandise_value']})"
+            f"{row['category']} (R$ {Decimal(row['merchandise_value']):,.2f})"
             for row in result["categories"]
         )
-        answer = f"Cinco categorías con mayor valor de mercancía entregada: {entries}."
+        answer = f"Top five categories by delivered merchandise value: {entries}."
     else:
-        answer = (f"Entregas tardías históricas: {result['rate_percent']:.2f}% "
-                  f"({result['late_orders']} de {result['comparable_delivered_orders']} "
-                  "pedidos entregados con fechas comparables).")
-    return answer + f" Fuente: {result['source_table']} (Olist 2016–2018).", result
+        answer = (f"Historical late delivery rate: {result['rate_percent']:.2f}% "
+                  f"({result['late_orders']:,} of {result['comparable_delivered_orders']:,} "
+                  "delivered orders with comparable dates).")
+    return answer + f" Source: {result['source_table']} (Olist 2016–2018)."
+
+
+def create_openai_client() -> OpenAI:
+    """Bound API latency and disable automatic retries (including billing errors)."""
+    from openai_policy import reserve_request
+    client = OpenAI(timeout=30.0, max_retries=0)
+    original_create = client.responses.create
+
+    def bounded_create(**kwargs):
+        reserve_request()
+        return original_create(**kwargs)
+
+    client.responses.create = bounded_create
+    return client
 
 
 def main() -> None:
@@ -245,31 +174,31 @@ def main() -> None:
         sys.stdout.reconfigure(encoding="utf-8")
         sys.stderr.reconfigure(encoding="utf-8")
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("question", nargs="?", help="Pregunta en lenguaje natural")
+    parser.add_argument("question", nargs="?", help="Natural-language question")
     parser.add_argument("--db", type=Path, default=DEFAULT_DB)
     parser.add_argument("--model", default=MODEL)
     args = parser.parse_args()
-    question = args.question or input("Pregunta: ")
+    question = args.question or input("Question: ")
     if not args.db.is_file():
-        parser.exit(1, "No se encontró la base. Ejecuta `python run.py` primero.\n")
+        parser.exit(1, "Database not found. Run `python run.py` first.\n")
     if not os.environ.get("OPENAI_API_KEY"):
-        parser.exit(1, "Falta OPENAI_API_KEY en el entorno.\n")
+        parser.exit(1, "OPENAI_API_KEY is missing from the environment.\n")
     try:
-        answer, _ = answer_question(question, args.db, OpenAI(), args.model)
+        answer, _ = answer_question(question, args.db, create_openai_client(), args.model)
     except RateLimitError as error:
         details = str(error.body) if error.body else ""
         if "insufficient_quota" in details or "credit_balance_exhausted" in details:
-            parser.exit(2, "La clave llegó a OpenAI, pero no quedan créditos API. "
-                        "Revisa https://platform.openai.com/settings/organization/billing\n")
-        parser.exit(2, "La API limitó temporalmente las solicitudes; intenta más tarde.\n")
+            parser.exit(2, "The key reached OpenAI, but no API credits remain. "
+                        "Check https://platform.openai.com/settings/organization/billing\n")
+        parser.exit(2, "The API temporarily limited requests; try again later.\n")
     except AuthenticationError:
-        parser.exit(2, "La clave OPENAI_API_KEY no fue aceptada por OpenAI.\n")
+        parser.exit(2, "OpenAI did not accept the OPENAI_API_KEY.\n")
     except APIConnectionError:
-        parser.exit(2, "No se pudo conectar con la API de OpenAI.\n")
+        parser.exit(2, "Unable to connect to the OpenAI API.\n")
     except APIError as error:
-        parser.exit(2, f"La API de OpenAI devolvió un error ({error.status_code}).\n")
-    except (ValueError, duckdb.Error) as error:
-        parser.exit(1, f"No se pudo consultar la métrica: {error}\n")
+        parser.exit(2, f"The OpenAI API returned an error ({error.status_code}).\n")
+    except (ValueError, duckdb.Error, RuntimeError) as error:
+        parser.exit(1, f"Unable to query the metric: {error}\n")
     print(answer)
 
 

@@ -4,17 +4,19 @@ This repository loads the public [Olist Brazilian E-Commerce dataset](https://ww
 
 ## Open the finished demo
 
-Open [`showcase/index.html`](showcase/index.html) in a browser. The packaged page contains the verified summary data, an interactive monthly chart, category ranking, operational KPIs, five guided questions, and a presentation section covering architecture, technical decisions, and validation. It works offline after extracting the ZIP. A short presenter walkthrough is in [`DEMO.md`](DEMO.md). To enable free-text GPT questions on the same page, run the local server after the database is built:
+The hosted review demo is available at **https://nearshift-takehome-demo.onrender.com/**. Use the reviewer credentials provided separately. The deployed English dashboard supports direct MCP revenue queries and GPT questions. See [`deploy/RENDER.md`](deploy/RENDER.md) for deployment evidence and the temporary Free service limits.
+
+Open [`showcase/index.html`](showcase/index.html) in a browser. The English interface has three views: **Overview** for metrics and charts, **Ask the data** for queries, and **Engineering** for architecture and validation. Query modes are separate tabs: **AI assistant**, **Revenue lookup** and **Offline examples**. The packaged page embeds its data, styles and scripts; all charts and offline examples work without services. It works offline after extracting the ZIP. Edit `showcase/template.html`, `showcase/dashboard.css` and `showcase/dashboard.js`, then run `python build_showcase.py` to regenerate the standalone HTML. Legacy links such as `#consultas` still open the matching view. A short presenter walkthrough is in [`DEMO.md`](DEMO.md). To enable free-text GPT questions on the same page, run the local server after the database is built:
 
 ```powershell
 python showcase_server.py
 ```
 
-Then open `http://127.0.0.1:8001/`. This optional feature uses the existing `OPENAI_API_KEY` and requires API credits. If credits are unavailable, the guided questions and every dashboard chart still work. The server binds only to `127.0.0.1`.
+Then open `http://127.0.0.1:8001/`. This optional feature uses the existing `OPENAI_API_KEY` and requires API credits. If credits are unavailable, the offline examples and every dashboard chart still work. The server binds only to `127.0.0.1`.
 
 ## Continue on another computer
 
-Clone the [private GitHub repository](https://github.com/DanielDi/nearshift-data-engineer-takehome) and open `showcase/index.html` for an immediate offline demo:
+Clone the [GitHub repository](https://github.com/DanielDi/nearshift-data-engineer-takehome) and open `showcase/index.html` for an immediate offline demo. The default `main` branch contains the complete submission:
 
 ```powershell
 git clone https://github.com/DanielDi/nearshift-data-engineer-takehome.git
@@ -32,7 +34,7 @@ Use Python 3.11 or newer. From the repository root:
 ```powershell
 python -m venv .venv
 .venv\Scripts\Activate.ps1
-python -m pip install -r requirements.txt
+python -m pip install -r requirements.lock.txt
 python run.py
 ```
 
@@ -47,9 +49,14 @@ The source CSVs, archive, and database live under `data/` and are excluded from 
 | `run.py` | Download, raw load, model execution, validation, exports and charts |
 | `api.py` and `api/openapi.json` | Local read-only revenue metric endpoint and OpenAPI schema |
 | `assistant.py` | GPT question router for five approved metrics, backed by fixed curated queries |
-| `build_showcase.py`, `showcase/` | Standalone interactive dashboard generator, template and finished HTML |
+| `metrics.py` | Shared read-only query service for HTTP, MCP and GPT |
+| `metrics_mcp.py`, `metrics_client.py`, `metric_contract.py` | MCP stdio server, local bridge and structured revenue contract |
+| `openai_policy.py` | Persistent daily API-attempt cap: SQLite locally, Postgres when hosted |
+| `render.yaml`, `deploy/`, `hosting_policy.py` | Render Free build, authenticated HTTPS hosting and deployment guide |
+| `requirements.lock.txt`, `.github/workflows/tests.yml` | Locked dependencies and offline CI checks |
+| `build_showcase.py`, `showcase/` | Dashboard generator; separate HTML template, dashboard.css and dashboard.js; generated standalone index.html |
 | `showcase_server.py` | Local dashboard server with optional bounded GPT question endpoint |
-| `DEMO.md` | Two-minute walkthrough for reviewers |
+| `DEMO.md` | Three-minute walkthrough for reviewers |
 | `tests/` | HTTP and assistant routing/guardrail tests |
 | `sql/model.sql` | Typed facts/dimensions and curated marts |
 | `reports/INSIGHTS.md` | Metric definitions, answers and charts |
@@ -122,12 +129,14 @@ Run the HTTP tests with `python -m unittest discover -s tests -v`. The tests use
 With `OPENAI_API_KEY` already set in your environment and `python run.py` completed:
 
 ```powershell
-python assistant.py "¿Cuál fue el valor de mercancía entregada en noviembre de 2017?"
-python assistant.py "¿Cuál fue el AOV del último mes disponible?"
-python assistant.py "¿Cuál fue la tasa histórica de recompra?"
-python assistant.py "¿Cuáles son las cinco categorías principales?"
-python assistant.py "¿Qué porcentaje de entregas llegó tarde?"
+python assistant.py "What was the delivered merchandise value in November 2017?"
+python assistant.py "What was the AOV in the latest available month?"
+python assistant.py "What was the historical repeat purchase rate?"
+python assistant.py "What were the top five categories?"
+python assistant.py "What percentage of delivered orders arrived late?"
 ```
+
+The interface, deterministic answers, errors and demo guide use English with en-US number/date formatting. Questions in other languages can still be routed to the same approved metrics.
 
 The supported scope is monthly delivered merchandise value, monthly AOV, lifetime repeat-purchase rate, top five categories by delivered merchandise value, and overall late-delivery rate. Other questions, requests for customer records, arbitrary SQL and period filters unsupported by a metric are rejected. A monthly question needs `YYYY-MM` or an explicit request for the latest **available source month**. “Last month” means the previous calendar month, which may be absent from this historical source; it is never silently replaced with August 2018. Numeric answers always identify the curated source table and the Olist historical period. The API endpoint above remains usable without OpenAI for direct revenue queries.
 
@@ -135,6 +144,34 @@ Run all tests with `python -m unittest discover -s tests -v`. Unit tests use a f
 
 ## Findings and scope
 
-See [`reports/INSIGHTS.md`](reports/INSIGHTS.md) for the five answers and charts. This implementation uses DuckDB and plain SQL to keep setup short and each transformation inspectable. It does not include an optional Metabase dashboard. With more time, I would add a scheduled refresh and CI check, investigate the payment discrepancies with refund records, and build a dashboard over the curated marts.
+See [`reports/INSIGHTS.md`](reports/INSIGHTS.md) for the five answers and charts. This implementation uses DuckDB and plain SQL to keep setup short and each transformation inspectable. It includes a standalone dashboard and an offline CI workflow, but no optional Metabase deployment. With more time, I would add a scheduled refresh and investigate payment discrepancies with refund records.
 
 Dataset attribution: Olist, *Brazilian E-Commerce Public Dataset*, version 2, [Kaggle data card](https://www.kaggle.com/datasets/olistbr/brazilian-ecommerce). The Kaggle metadata lists a CC BY-NC-SA 4.0 license; raw data is downloaded at runtime instead of redistributed in this repository.
+
+## Local MCP integration and governance
+
+Start `python showcase_server.py` and open `http://127.0.0.1:8001/`. **Revenue lookup** queries DuckDB through a real MCP stdio subprocess without OpenAI or credits. Natural-language monthly revenue questions use OpenAI to select intent/month, then call the same MCP tool. AOV, repeat purchase, categories and late delivery use the shared `metrics.py` service; only revenue is exposed over MCP in contract v1.
+
+```powershell
+python metrics_client.py 2017-11
+python metrics_client.py latest
+python showcase_server.py
+```
+
+The client starts/stops `metrics_mcp.py` automatically. Another MCP host can start it with the virtual environment Python executable and absolute script path. `--db` is operator configuration, never a model argument. No API key belongs in MCP host configuration. `python metrics_mcp.py` is a protocol server, not an interactive prompt.
+
+The sole tool is `get_monthly_revenue(month: str)`, requiring YYYY-MM or explicit `latest`. Structured output includes status, exact decimal amount as a string, BRL, month, delivered orders, definition, source table and historical coverage note. An absent month returns `month_unavailable`, not zero or the latest month. SQL is shared with the existing HTTP API. No SQL, raw-record, filesystem or write tool is exposed. Annotations describe behavior; fixed parameterized SQL and DuckDB read-only connections enforce it.
+
+The official SDK is pinned to `mcp==2.3.0` and negotiates the protocol. The subprocess receives an OS environment allowlist and an empty `OPENAI_API_KEY`; it makes no OpenAI calls. Protocol messages use stdout and audit records stderr. Records contain request ID, tool, validated month, outcome, duration and contract version, never the key or full question. Capture logs outside Git with a short retention policy. `data/source_manifest.json` records source version/hash; Git identifies the code version. Rebuild before starting services; do not run database writers concurrently with readers.
+
+OpenAI policy: `OPENAI_MODEL` defaults to `gpt-6-luna`; one model request and at most one metric call per question; 160 maximum output tokens; `store=False`; 30-second API timeout; no automatic retries; 20 API attempts per Bogota calendar day. `data/openai_usage.sqlite3` persists the counter across CLI/server restarts and processes; errors consume an attempt. This local demo limit is not a billing cap. MCP has a 20-second overall timeout. Dashboard POST requests require its loopback Host and same Origin when supplied; CORS is not enabled.
+
+Use a dedicated OpenAI project with only model-request permissions and model-list read if needed. Administrative credentials remain outside the application. Rotate keys exposed in chat, confirm the owner's email in Platform, and set expiry. Keep the key outside Git/frontend and only in the assistant parent process. A USD 5 monthly hard spend limit and alerts at 50%/80% are recommended **Platform settings, not configured by this repository**. `store=False` does not establish Zero Data Retention. No raw Olist/customer records are sent to OpenAI.
+
+CI runs locked dependencies and fixture-backed tests on Python 3.13, Windows and Linux, without keys, downloads or API costs. Tests exercise real MCP discovery/calls, invalid/missing/extra arguments, unknown tools, output validation, shared-service values, database immutability, dashboard integration and the persistent daily cap. Remote CI still needs a push; a local pass alone is not a remote CI result.
+
+Hosted Responses MCP cannot directly reach this stdio process: this application uses a local bridge. Native remote MCP, OAuth or Secure MCP Tunnel is a separate deployment decision. No public service or Platform administration is required for this take-home.
+
+## Temporary hosting on Render Free
+
+The tested hosting configuration is in [`render.yaml`](render.yaml); follow [`deploy/RENDER.md`](deploy/RENDER.md) for setup and acceptance checks. It builds a compact read-only metrics snapshot and serves the English dashboard behind reviewer authentication. Render handles HTTPS and the public port; exact origin validation remains enabled. A separate free Postgres instance persists the daily API-attempt counter across web-service restarts and expires after 30 days. Hosted AI fails closed without that counter. No paid upgrade or automatic deletion is configured. Publishing the configuration alone does not prove a live deployment or live Postgres persistence.

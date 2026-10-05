@@ -1,0 +1,9 @@
+data/
+NearShift_submission.zip
+NearShift_DataEng_TakeHome_Assignment.pdf
+__pycache__/
+.venv/
+*.pyc
+.env
+.env.*
+!.env.example

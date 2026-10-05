@@ -1,0 +1,69 @@
+{
+  "openapi": "3.0.3",
+  "info": {
+    "title": "Olist curated revenue metric",
+    "version": "1.0.0",
+    "description": "Read-only tool for a historical Olist revenue proxy. Values come only from analytics.mart_monthly_metrics. The dataset is not current business data."
+  },
+  "servers": [{"url": "/"}],
+  "paths": {
+    "/metrics/revenue": {
+      "get": {
+        "operationId": "getDeliveredMerchandiseValueForMonth",
+        "summary": "Get delivered merchandise value for an explicit purchase month",
+        "description": "Use only when the requested calendar month is known. A missing month returns 404; do not substitute another month or infer a current value.",
+        "parameters": [{
+          "name": "month",
+          "in": "query",
+          "required": true,
+          "description": "Purchase month in YYYY-MM format.",
+          "schema": {"type": "string", "pattern": "^[0-9]{4}-(0[1-9]|1[0-2])$", "example": "2017-11"}
+        }],
+        "responses": {
+          "200": {"description": "Historical revenue proxy and provenance", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RevenueMetric"}}}},
+          "400": {"description": "Invalid or missing month"},
+          "404": {"description": "Month absent from the dataset"}
+        }
+      }
+    },
+    "/metrics/revenue/latest": {
+      "get": {
+        "operationId": "getLatestObservedDeliveredMerchandiseValue",
+        "summary": "Get the latest historical purchase month with delivered orders",
+        "description": "This is the latest observed month in the static Olist data, not last calendar month. Always state the returned month and latest_source_purchase_date in an answer.",
+        "responses": {
+          "200": {"description": "Latest historical revenue proxy and provenance", "content": {"application/json": {"schema": {"$ref": "#/components/schemas/RevenueMetric"}}}},
+          "404": {"description": "No month with delivered orders"}
+        }
+      }
+    },
+    "/health": {
+      "get": {
+        "operationId": "getHealth",
+        "summary": "Confirm the modeled database was available at startup",
+        "responses": {"200": {"description": "Database was ready at startup"}}
+      }
+    }
+  },
+  "components": {
+    "schemas": {
+      "RevenueMetric": {
+        "type": "object",
+        "required": ["metric", "month", "value", "currency", "delivered_orders", "definition", "source_table", "in_trend_window", "latest_source_purchase_date", "coverage_note", "selection"],
+        "properties": {
+          "metric": {"type": "string", "enum": ["delivered_merchandise_value"]},
+          "month": {"type": "string", "example": "2017-11"},
+          "value": {"type": "string", "description": "Exact decimal amount, two places.", "example": "987765.37"},
+          "currency": {"type": "string", "enum": ["BRL"]},
+          "delivered_orders": {"type": "integer", "example": 7289},
+          "definition": {"type": "string"},
+          "source_table": {"type": "string", "enum": ["analytics.mart_monthly_metrics"]},
+          "in_trend_window": {"type": "boolean"},
+          "latest_source_purchase_date": {"type": "string", "format": "date"},
+          "coverage_note": {"type": "string"},
+          "selection": {"type": "string", "enum": ["explicit_month", "latest_month_with_delivered_orders"]}
+        }
+      }
+    }
+  }
+}

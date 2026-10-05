@@ -1,0 +1,9 @@
+order_status,orders,item_subtotal,freight_total,payment_total,orders_without_items,orders_without_payment,payment_mismatches
+delivered,96478,13221498.11,2198275.64,15422461.77,0,1,299
+shipped,1107,150727.44,26401.90,177213.96,1,0,2
+canceled,625,95235.27,10650.45,143255.60,164,0,2
+unavailable,609,2007.69,132.80,126479.51,603,0,0
+invoiced,314,61526.37,7462.38,69137.99,2,0,0
+processing,301,60439.22,8954.89,69394.11,0,0,0
+created,5,0.00,0.00,688.10,5,0,0
+approved,2,209.60,31.48,241.08,0,0,0
